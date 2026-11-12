@@ -24,6 +24,12 @@ class TransportIndexTests(unittest.TestCase):
         best = engine.earliest_arrivals(0, 0, 3, events, [10, 80], max_hours=3)
         self.assertEqual(best[1], 20)
         self.assertEqual(best[2], engine.INF)
+        shorter = engine.earliest_arrivals(0, 0, 3, events, [10, 80],
+                                            max_hours=3, transfer_minutes=60)
+        self.assertEqual(shorter[2], 90)
+        arrival, path = engine.earliest_path(0, 2, 0, 3, events, [10, 80],
+                                              max_hours=3, transfer_minutes=60)
+        self.assertEqual((arrival, path), (90, (0, 1)))
 
         events.append((1, 2, 120, 130))
         best = engine.earliest_arrivals(0, 0, 3, events, [10, 80, 120], max_hours=3)

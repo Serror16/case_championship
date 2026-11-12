@@ -11,7 +11,8 @@ import roster
 
 
 def compute(origin: str, horizon_key: str | None = None, network: list[dict] | None = None,
-            horizon_hours: int | None = None) -> dict:
+            horizon_hours: int | None = None,
+            transfer_minutes: int = engine.TRANSFER_MINUTES) -> dict:
     if origin not in roster.RATED:
         raise ValueError("Выберите населённый пункт из расчёта индекса")
     if horizon_hours is not None:
@@ -38,7 +39,8 @@ def compute(origin: str, horizon_key: str | None = None, network: list[dict] | N
                 continue
             starts[season] += 1
             arrivals = engine.earliest_arrivals(indexes[origin], start, len(nodes),
-                                                events, departures, max_hours=168)
+                                                events, departures, max_hours=168,
+                                                transfer_minutes=transfer_minutes)
             for destination in destinations:
                 duration = arrivals[indexes[destination]] - start
                 if duration <= 168 * 60:
@@ -79,7 +81,8 @@ def compute(origin: str, horizon_key: str | None = None, network: list[dict] | N
 
 
 def journey(origin: str, destination: str, start_iso: str,
-            network: list[dict] | None = None) -> dict:
+            network: list[dict] | None = None,
+            transfer_minutes: int = engine.TRANSFER_MINUTES) -> dict:
     if origin not in roster.RATED or destination not in roster.RATED or origin == destination:
         raise ValueError("Выберите два разных пункта из расчёта индекса")
     try:
@@ -92,7 +95,8 @@ def journey(origin: str, destination: str, start_iso: str,
     network, nodes, indexes, events, departures, _ = bus.prepare(network)
     start = int((moment - engine.EPOCH).total_seconds() // 60)
     arrival, path = engine.earliest_path(indexes[origin], indexes[destination],
-                                         start, len(nodes), events, departures)
+                                         start, len(nodes), events, departures,
+                                         transfer_minutes=transfer_minutes)
     if arrival == engine.INF:
         return {"found": False, "legs": []}
     return {

@@ -24,7 +24,8 @@ MAX_HOURS = max(bus.HORIZONS.values())
 
 
 def compute(network: list[dict] | None = None, horizon_key: str | None = None,
-            horizon_hours: int | None = None) -> dict:
+            horizon_hours: int | None = None,
+            transfer_minutes: int = engine.TRANSFER_MINUTES) -> dict:
     if horizon_key is not None and horizon_key not in bus.HORIZONS:
         raise ValueError(f"Unknown horizon: {horizon_key}")
     if horizon_hours is not None:
@@ -54,7 +55,8 @@ def compute(network: list[dict] | None = None, horizon_key: str | None = None,
             for origin in PLACES:
                 best = engine.earliest_arrivals(indexes[origin], start, len(nodes),
                                                 events, departures,
-                                                max_hours=max(horizons.values()))
+                                                max_hours=max(horizons.values()),
+                                                transfer_minutes=transfer_minutes)
                 for destination in PLACES:
                     if destination == origin:
                         continue

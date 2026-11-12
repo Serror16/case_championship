@@ -21,12 +21,18 @@ WEB = Path(__file__).resolve().parent
 BASE = bus.load_events()
 CATALOG = scenario.catalog(BASE)
 NODES = sorted({name for event in BASE for name in (event["from"], event["to"])})
-BASELINE = json.loads((ROOT / "results" / "CORRECTED_ROSTER_37.json").read_text(encoding="utf-8"))
+SITE_TRANSFER_MINUTES = 60
+
+
+@lru_cache(maxsize=1)
+def site_baseline() -> dict:
+    return index.compute(network=BASE, transfer_minutes=SITE_TRANSFER_MINUTES)
 
 
 @lru_cache(maxsize=120)
 def baseline_detail(place: str, hours: int) -> dict:
-    return detail.compute(place, network=BASE, horizon_hours=hours)
+    return detail.compute(place, network=BASE, horizon_hours=hours,
+                          transfer_minutes=SITE_TRANSFER_MINUTES)
 
 
 def table(result: dict, horizon: str) -> list[dict]:
@@ -42,7 +48,9 @@ def table(result: dict, horizon: str) -> list[dict]:
 @lru_cache(maxsize=32)
 def baseline_table(hours: int) -> list[dict]:
     key = air.horizon_key(hours)
-    result = BASELINE if key in BASELINE["horizons_hours"] else index.compute(horizon_hours=hours)
+    result = (site_baseline() if key in bus.HORIZONS else
+              index.compute(network=BASE, horizon_hours=hours,
+                            transfer_minutes=SITE_TRANSFER_MINUTES))
     return table(result, key)
 
 
@@ -58,12 +66,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/api/bootstrap":
+            baseline = site_baseline()
             self.send_json({
                 "regions": [scenario.REGION], "region": scenario.REGION,
                 "places": index.PLACES, "nodes": NODES,
-                "horizons": bus.HORIZONS, "seasons": list(BASELINE["scores"]),
+                "horizons": bus.HORIZONS, "seasons": list(baseline["scores"]),
                 "catalog": CATALOG, "baseline": {
-                    key: table(BASELINE, key) for key in bus.HORIZONS
+                    key: table(baseline, key) for key in bus.HORIZONS
                 },
                 "baseline_events": len(BASE),
             })
@@ -105,18 +114,21 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/journey":
                 self.send_json(detail.journey(request.get("place"),
                                               request.get("destination"),
-                                              request.get("start"), network))
+                                              request.get("start"), network,
+                                              transfer_minutes=SITE_TRANSFER_MINUTES))
                 return
             if self.path == "/api/place":
                 place = request.get("place")
                 original = baseline_detail(place, hours)
                 current = (original if not request.get("removed") and not request.get("additions")
-                           else detail.compute(place, network=network, horizon_hours=hours))
+                           else detail.compute(place, network=network, horizon_hours=hours,
+                                               transfer_minutes=SITE_TRANSFER_MINUTES))
                 self.send_json({"current": current, "baseline": original, "counts": counts})
                 return
             original = baseline_table(hours)
             rows = (original if not request.get("removed") and not request.get("additions")
-                    else table(index.compute(network, horizon_hours=hours), key))
+                    else table(index.compute(network, horizon_hours=hours,
+                                             transfer_minutes=SITE_TRANSFER_MINUTES), key))
             self.send_json({"rows": rows, "baseline": original, "counts": counts})
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self.send_json({"error": str(exc)}, 400)
