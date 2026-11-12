@@ -23,8 +23,12 @@ MISSING = sorted(set(roster.SETTLEMENTS) - set(PLACES))
 MAX_HOURS = max(bus.HORIZONS.values())
 
 
-def compute() -> dict:
-    _, nodes, indexes, events, departures, counts = bus.prepare()
+def compute(network: list[dict] | None = None, horizon_key: str | None = None) -> dict:
+    if horizon_key is not None and horizon_key not in bus.HORIZONS:
+        raise ValueError(f"Unknown horizon: {horizon_key}")
+    horizons = ({horizon_key: bus.HORIZONS[horizon_key]} if horizon_key
+                else bus.HORIZONS)
+    _, nodes, indexes, events, departures, counts = bus.prepare(network)
     if not all(place in indexes for place in PLACES):
         raise ValueError("A rated settlement is absent from the transport graph")
     starts = defaultdict(int)
@@ -34,7 +38,7 @@ def compute() -> dict:
         season = air.season_for(air.FIRST + timedelta(days=day_number))
         for hour in engine.START_HOURS:
             start = day_number * 1440 + hour * 60
-            valid = [(key, horizon * 60) for key, horizon in bus.HORIZONS.items()
+            valid = [(key, horizon * 60) for key, horizon in horizons.items()
                      if start + horizon * 60 < engine.END_MINUTES]
             if not valid:
                 continue
@@ -43,7 +47,7 @@ def compute() -> dict:
             for origin in PLACES:
                 best = engine.earliest_arrivals(indexes[origin], start, len(nodes),
                                                 events, departures,
-                                                max_hours=MAX_HOURS)
+                                                max_hours=max(horizons.values()))
                 for destination in PLACES:
                     if destination == origin:
                         continue
@@ -58,7 +62,7 @@ def compute() -> dict:
         scores[season] = {}
         for origin in PLACES:
             scores[season][origin] = {}
-            for key in bus.HORIZONS:
+            for key in horizons:
                 token = season, origin, key
                 random_total = starts[season, key] * (len(PLACES) - 1)
                 ever_total = len(PLACES) - 1
@@ -81,7 +85,7 @@ def compute() -> dict:
         "rated_settlements": PLACES,
         "unrated_settlements": MISSING,
         "destination_denominator_per_origin": len(PLACES) - 1,
-        "horizons_hours": bus.HORIZONS,
+        "horizons_hours": horizons,
         "start_hours": list(engine.START_HOURS),
         "seasons": {name: sorted(months) for name, months in air.SEASONS.items()},
         "sources_manifest": "SOURCES.md",

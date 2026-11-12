@@ -63,9 +63,11 @@ def load_events() -> list[dict]:
     return events
 
 
-def prepare() -> tuple[list, list, dict, list, list, dict]:
-    network = load_events()
-    nodes = sorted({place for event in network for place in (event["from"], event["to"])})
+def prepare(network: list[dict] | None = None) -> tuple[list, list, dict, list, list, dict]:
+    network = sorted(load_events() if network is None else network,
+                     key=lambda event: event["depart"])
+    nodes = sorted(roster.RATED | {place for event in network
+                                   for place in (event["from"], event["to"])})
     indexes = {node: i for i, node in enumerate(nodes)}
     compact = [(indexes[event["from"]], indexes[event["to"]],
                 int((event["depart"] - engine.EPOCH).total_seconds() // 60),

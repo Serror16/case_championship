@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b3b">
+  <title>Транспортная связанность · Сценарный расчёт</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">⌁</span><span>Индекс транспортной<br>достижимости</span></div>
+    <div class="topbar-right"><span class="status-dot"></span> Пилот · 2026 <span class="top-separator">/</span> Чукотка</div>
+  </header>
+
+  <main>
+    <section class="intro">
+      <div>
+        <p class="eyebrow">ИНТЕРАКТИВНАЯ МОДЕЛЬ ТРАНСПОРТНОЙ СЕТИ</p>
+        <h1>Как новый маршрут меняет доступность региона?</h1>
+        <p class="lead">Добавьте соединение или исключите существующее, затем сравните сезонные оценки населённых пунктов с исходной сетью.</p>
+      </div>
+      <div class="intro-stat"><strong>37</strong><span>населённых пунктов<br>в пилотном расчёте</span></div>
+    </section>
+
+    <section class="toolbar panel" aria-label="Параметры расчёта">
+      <div class="field"><label for="region">Регион</label><select id="region"><option>Чукотка</option></select></div>
+      <div class="field"><label for="horizon">Порог времени H</label><select id="horizon"><option value="48ч">48 часов</option><option value="72ч">72 часа</option><option value="7сут">7 суток</option></select></div>
+      <div class="toolbar-note">Время ожидания и пересадки входят в H. Старт проверяется каждые 2 часа в течение всего сезона.</div>
+      <button id="calculate" class="primary" type="button">Пересчитать индекс <span aria-hidden="true">↗</span></button>
+    </section>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="panel editor">
+          <div class="section-head"><div><p class="eyebrow">01 / ИЗМЕНЕНИЯ СЕТИ</p><h2>Добавить соединение</h2></div></div>
+          <form id="route-form">
+            <div class="field"><label for="origin">Откуда</label><select id="origin" required></select></div>
+            <div class="field"><label for="destination">Куда</label><select id="destination" required></select></div>
+            <div class="form-grid">
+              <div class="field"><label for="first-date">Первая дата</label><input id="first-date" type="date" min="2026-01-01" max="2026-12-31" value="2026-07-01" required></div>
+              <div class="field"><label for="last-date">Последняя дата</label><input id="last-date" type="date" min="2026-01-01" max="2026-12-31" value="2026-09-30" required></div>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label for="departure-time">Отправление</label><input id="departure-time" type="time" value="09:00" required></div>
+              <div class="field"><label for="duration">В пути, минут</label><input id="duration" type="number" min="1" max="10080" value="120" required></div>
+            </div>
+            <div class="field"><label for="repeat-days">Ходит раз в N дней</label><input id="repeat-days" type="number" min="1" max="366" value="1" required><small>1 — ежедневно; отдельный рейс создаётся на каждую дату до последнего дня включительно.</small></div>
+            <label class="check"><input id="reverse" type="checkbox"><span>Добавить обратное направление<br><small>С теми же датой, временем и длительностью</small></span></label>
+            <button class="secondary full" type="submit">Добавить в сценарий <span aria-hidden="true">＋</span></button>
+          </form>
+        </section>
+
+        <section class="panel editor">
+          <div class="section-head"><div><p class="eyebrow">02 / ИСХОДНЫЕ ДАННЫЕ</p><h2>Исключить соединение</h2></div></div>
+          <div class="field"><label for="route-search">Поиск по пункту или рейсу</label><input id="route-search" type="search" placeholder="Например, Анадырь или автобус № 2"></div>
+          <p class="hint">Здесь видны исходные и добавленные вами соединения. Исходная дуга исключается из расчёта на 2026 год; ваш маршрут убирается из сценария целиком.</p>
+          <div id="route-list" class="route-list" aria-live="polite"></div>
+        </section>
+      </aside>
+
+      <section class="results">
+        <section class="panel scenario-panel">
+          <div class="section-head"><div><p class="eyebrow">03 / ТЕКУЩИЙ СЦЕНАРИЙ</p><h2>Изменения графа</h2></div><button id="reset" class="text-button" type="button">Сбросить всё</button></div>
+          <div id="scenario-list" class="scenario-list"></div>
+          <p id="scenario-summary" class="hint"></p>
+        </section>
+
+        <section class="panel result-panel">
+          <div class="section-head result-heading"><div><p class="eyebrow">04 / РЕЗУЛЬТАТЫ</p><h2>Доступность по сезонам</h2><p id="result-status" class="hint">Исходная сеть · порог 48 часов</p></div><div class="metric-switch" role="group" aria-label="Показатель"><button class="active" data-metric="random_start" type="button">При случайном старте</button><button data-metric="ever_reachable" type="button">Достижимо хотя бы раз</button></div></div>
+          <div id="message" class="message" role="status" aria-live="polite"></div>
+          <div class="table-wrap"><table><thead><tr><th scope="col">Населённый пункт</th><th scope="col">Зима</th><th scope="col">Весеннее<br>межсезонье</th><th scope="col">Лето</th><th scope="col">Осеннее<br>межсезонье</th></tr></thead><tbody id="results-body"></tbody></table></div>
+          <div class="legend"><span><i class="swatch base"></i> исходная сеть</span><span><i class="swatch plus"></i> рост оценки</span><span><i class="swatch minus"></i> снижение оценки</span></div>
+        </section>
+      </section>
+    </div>
+    <footer>Сценарные изменения хранятся только в этой вкладке и не меняют исходные CSV. Часть расписаний и подъездов основана на допущениях. <a href="https://github.com/Serror16/case_championship" target="_blank" rel="noopener noreferrer">Методика и данные ↗</a></footer>
+  </main>
+</body>
+</html>
