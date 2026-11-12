@@ -4,13 +4,16 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+import air  # noqa: E402
 import bus  # noqa: E402
+import detail  # noqa: E402
 import index  # noqa: E402
 import scenario  # noqa: E402
 
@@ -21,6 +24,11 @@ NODES = sorted({name for event in BASE for name in (event["from"], event["to"])}
 BASELINE = json.loads((ROOT / "results" / "CORRECTED_ROSTER_37.json").read_text(encoding="utf-8"))
 
 
+@lru_cache(maxsize=120)
+def baseline_detail(place: str, hours: int) -> dict:
+    return detail.compute(place, network=BASE, horizon_hours=hours)
+
+
 def table(result: dict, horizon: str) -> list[dict]:
     return [{
         "place": place,
@@ -29,6 +37,13 @@ def table(result: dict, horizon: str) -> list[dict]:
             "ever_reachable": result["scores"][season][place][horizon]["ever_reachable"]["pct"],
         } for season in result["scores"]},
     } for place in index.PLACES]
+
+
+@lru_cache(maxsize=32)
+def baseline_table(hours: int) -> list[dict]:
+    key = air.horizon_key(hours)
+    result = BASELINE if key in BASELINE["horizons_hours"] else index.compute(horizon_hours=hours)
+    return table(result, key)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -54,12 +69,15 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         assets = {"/": ("index.html", "text/html"),
+                  "/place": ("place.html", "text/html"),
                   "/app.js": ("app.js", "text/javascript"),
+                  "/place.js": ("place.js", "text/javascript"),
                   "/style.css": ("style.css", "text/css")}
-        if self.path not in assets:
+        path = self.path.split("?", 1)[0]
+        if path not in assets:
             self.send_error(404)
             return
-        filename, mime = assets[self.path]
+        filename, mime = assets[path]
         body = (WEB / filename).read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", f"{mime}; charset=utf-8")
@@ -69,7 +87,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self) -> None:
-        if self.path != "/api/calculate":
+        if self.path not in {"/api/calculate", "/api/place", "/api/journey"}:
             self.send_error(404)
             return
         try:
@@ -79,16 +97,27 @@ class Handler(BaseHTTPRequestHandler):
             request = json.loads(self.rfile.read(size))
             if not isinstance(request, dict) or request.get("region") != scenario.REGION:
                 raise ValueError("Неизвестный регион")
-            horizon = request.get("horizon")
-            if horizon not in bus.HORIZONS:
-                raise ValueError("Неизвестный порог H")
+            hours = (request["horizon_hours"] if "horizon_hours" in request
+                     else bus.HORIZONS.get(request.get("horizon")))
+            key = air.horizon_key(hours)
             network, counts = scenario.apply(BASE, request.get("removed", []),
                                              request.get("additions", []))
-            if not request.get("removed") and not request.get("additions"):
-                result = BASELINE
-            else:
-                result = index.compute(network, horizon_key=horizon)
-            self.send_json({"rows": table(result, horizon), "counts": counts})
+            if self.path == "/api/journey":
+                self.send_json(detail.journey(request.get("place"),
+                                              request.get("destination"),
+                                              request.get("start"), network))
+                return
+            if self.path == "/api/place":
+                place = request.get("place")
+                original = baseline_detail(place, hours)
+                current = (original if not request.get("removed") and not request.get("additions")
+                           else detail.compute(place, network=network, horizon_hours=hours))
+                self.send_json({"current": current, "baseline": original, "counts": counts})
+                return
+            original = baseline_table(hours)
+            rows = (original if not request.get("removed") and not request.get("additions")
+                    else table(index.compute(network, horizon_hours=hours), key))
+            self.send_json({"rows": rows, "baseline": original, "counts": counts})
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self.send_json({"error": str(exc)}, 400)
 

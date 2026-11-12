@@ -23,11 +23,18 @@ MISSING = sorted(set(roster.SETTLEMENTS) - set(PLACES))
 MAX_HOURS = max(bus.HORIZONS.values())
 
 
-def compute(network: list[dict] | None = None, horizon_key: str | None = None) -> dict:
+def compute(network: list[dict] | None = None, horizon_key: str | None = None,
+            horizon_hours: int | None = None) -> dict:
     if horizon_key is not None and horizon_key not in bus.HORIZONS:
         raise ValueError(f"Unknown horizon: {horizon_key}")
-    horizons = ({horizon_key: bus.HORIZONS[horizon_key]} if horizon_key
-                else bus.HORIZONS)
+    if horizon_hours is not None:
+        if horizon_key is not None:
+            raise ValueError("Укажите H в часах или известное название порога")
+        key = air.horizon_key(horizon_hours)
+        horizons = {key: horizon_hours}
+    else:
+        horizons = ({horizon_key: bus.HORIZONS[horizon_key]} if horizon_key
+                    else bus.HORIZONS)
     _, nodes, indexes, events, departures, counts = bus.prepare(network)
     if not all(place in indexes for place in PLACES):
         raise ValueError("A rated settlement is absent from the transport graph")

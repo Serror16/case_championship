@@ -11,7 +11,7 @@
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-mark">⌁</span><span>Индекс транспортной<br>достижимости</span></div>
-    <div class="topbar-right"><span class="status-dot"></span> Пилот · 2026 <span class="top-separator">/</span> Чукотка</div>
+    <div class="topbar-right"><span class="status-dot"></span> Индекс · 2026 <span class="top-separator">/</span> Чукотка</div>
   </header>
 
   <main>
@@ -21,13 +21,13 @@
         <h1>Как новый маршрут меняет доступность региона?</h1>
         <p class="lead">Добавьте соединение или исключите существующее, затем сравните сезонные оценки населённых пунктов с исходной сетью.</p>
       </div>
-      <div class="intro-stat"><strong>37</strong><span>населённых пунктов<br>в пилотном расчёте</span></div>
+      <div class="intro-stat"><strong>37</strong><span>населённых пунктов<br>в расчёте индекса</span></div>
     </section>
 
     <section class="toolbar panel" aria-label="Параметры расчёта">
       <div class="field"><label for="region">Регион</label><select id="region"><option>Чукотка</option></select></div>
-      <div class="field"><label for="horizon">Порог времени H</label><select id="horizon"><option value="48ч">48 часов</option><option value="72ч">72 часа</option><option value="7сут">7 суток</option></select></div>
-      <div class="toolbar-note">Время ожидания и пересадки входят в H. Старт проверяется каждые 2 часа в течение всего сезона.</div>
+      <div class="field"><label for="horizon">Порог времени H, часов</label><input id="horizon" type="number" min="1" max="168" step="1" value="48" required></div>
+      <div class="toolbar-note">Введите от 1 до 168 часов. Время ожидания и пересадки входят в H; старт проверяется каждые 2 часа в течение сезона.</div>
       <button id="calculate" class="primary" type="button">Пересчитать индекс <span aria-hidden="true">↗</span></button>
     </section>
 

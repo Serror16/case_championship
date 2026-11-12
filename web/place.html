@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102b3b">
+  <title>Населённый пункт · Индекс транспортной достижимости</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/place.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">⌁</span><span>Индекс транспортной<br>достижимости</span></div>
+    <div class="topbar-right"><span class="status-dot"></span> Индекс · 2026 <span class="top-separator">/</span> Чукотка</div>
+  </header>
+  <main class="detail-page">
+    <a class="back-link" href="/">← Общая таблица</a>
+    <section class="detail-intro">
+      <p class="eyebrow">ПОДРОБНОСТИ ПО НАСЕЛЁННОМУ ПУНКТУ</p>
+      <h1 id="place-title">Загрузка…</h1>
+      <p class="lead">Куда можно доехать из этого пункта, насколько часто поездка укладывается в выбранное время и какие направления требуют проверки.</p>
+    </section>
+    <section class="toolbar panel detail-toolbar" aria-label="Параметры подробного расчёта">
+      <div class="field"><label for="horizon">Порог времени H, часов</label><input id="horizon" type="number" min="1" max="168" step="1" value="48" required></div>
+      <div class="toolbar-note">Введите от 1 до 168 часов. Сценарные изменения из общей таблицы применяются и здесь.</div>
+      <button id="refresh" class="primary" type="button">Рассчитать подробности ↗</button>
+    </section>
+    <div id="detail-message" class="message detail-message" role="status" aria-live="polite">Загружаем данные…</div>
+    <section class="detail-cards" id="season-cards" aria-label="Оценки по сезонам"></section>
+    <section class="panel result-panel detail-results">
+      <div class="section-head detail-section-head"><div><p class="eyebrow">НАПРАВЛЕНИЯ ДЛЯ ПРОВЕРКИ</p><h2 id="season-title">Зима</h2></div><div class="field"><label for="destination-filter">Показать</label><select id="destination-filter"><option value="all">Все направления</option><option value="reachable">Связь в пределах H найдена</option><option value="over_h">Связь найдена, за пределами H</option><option value="no_path_7d">Связь не найдена</option></select></div></div>
+      <p class="hint">Зелёный: поездка найдена в пределах H. Жёлтый: поездка найдена в пределах 7 суток, но дольше H. Красный: путь за 7 суток не найден в текущей модели; это не доказывает отсутствия реального сообщения.</p>
+      <div class="table-wrap"><table class="detail-table"><thead><tr><th scope="col">Пункт назначения</th><th scope="col">Удачные старты</th><th scope="col">Хотя бы раз</th><th scope="col">Быстрейшая поездка</th><th scope="col">Статус связи</th></tr></thead><tbody id="destination-body"></tbody></table></div>
+      <p id="detail-count" class="hint detail-count"></p>
+    </section>
+    <footer>Проверяются старты каждые 2 часа во все дни сезона. Время ожидания и пересадки входит в H. Источники и ограничения описаны в <a href="https://github.com/Serror16/case_championship" target="_blank" rel="noopener noreferrer">репозитории проекта ↗</a></footer>
+  </main>
+</body>
+</html>

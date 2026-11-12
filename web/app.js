@@ -1,9 +1,10 @@
 const $ = (id) => document.getElementById(id);
 const STORE = "chukotka-index-scenario-v1";
 const seasonNames = ["Зима", "Весеннее межсезонье", "Лето", "Осеннее межсезонье"];
-const state = { bootstrap: null, additions: [], removed: [], rows: null, displayedHorizon: "48ч", metric: "random_start", dirty: false, busy: false, revision: 0 };
+const state = { bootstrap: null, additions: [], removed: [], rows: null, baselineRows: null, displayedHorizon: 48, metric: "random_start", dirty: false, busy: false, revision: 0 };
 const format = (value) => `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value)}%`;
-const horizonLabel = (key) => ({ "48ч": "48 часов", "72ч": "72 часа", "7сут": "7 суток" })[key];
+const horizonLabel = (hours) => Number.isInteger(hours) && hours >= 1 && hours <= 168 ? `${hours} ч` : "не задан";
+const selectedHorizon = () => Number($("horizon").value);
 
 function restore() {
   try {
@@ -25,9 +26,9 @@ function markDirty() {
 
 function renderStatus() {
   const count = state.additions.length + state.removed.length;
-  const pending = state.dirty || $("horizon").value !== state.displayedHorizon;
+  const pending = state.dirty || selectedHorizon() !== state.displayedHorizon;
   $("result-status").textContent = pending
-    ? `Показан предыдущий расчёт · H = ${horizonLabel(state.displayedHorizon)}. Выбран H = ${horizonLabel($("horizon").value)} · нажмите «Пересчитать индекс»`
+    ? `Показан предыдущий расчёт · H = ${horizonLabel(state.displayedHorizon)}. Выбран H = ${horizonLabel(selectedHorizon())} · нажмите «Пересчитать индекс»`
     : `${count ? "Сценарий" : "Исходная сеть"} · порог ${horizonLabel(state.displayedHorizon)}`;
   $("calculate").disabled = state.busy;
   $("calculate").textContent = state.busy ? "Выполняется расчёт…" : "Пересчитать индекс ↗";
@@ -90,10 +91,13 @@ function renderCatalog() {
 function renderTable() {
   const body = $("results-body"); body.replaceChildren();
   const horizon = state.displayedHorizon;
-  const baseline = state.bootstrap.baseline[horizon];
+  const baseline = state.baselineRows;
   state.rows.forEach((row, index) => {
     const tr = document.createElement("tr");
-    const th = document.createElement("th"); th.scope = "row"; th.textContent = row.place; tr.append(th);
+    const th = document.createElement("th"); th.scope = "row";
+    const link = document.createElement("a"); link.className = "place-link";
+    link.href = `/place?name=${encodeURIComponent(row.place)}&h=${encodeURIComponent(horizon)}`;
+    link.textContent = `${row.place} ↗`; th.append(link); tr.append(th);
     seasonNames.forEach((season) => {
       const td = document.createElement("td");
       const value = row.seasons[season][state.metric];
@@ -109,16 +113,17 @@ function renderTable() {
 
 async function calculate() {
   if (state.busy) return;
-  const horizon = $("horizon").value;
+  const horizon = selectedHorizon();
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 168) { message("Введите целое число часов от 1 до 168.", true); return; }
   const revision = state.revision;
   state.busy = true; renderStatus(); message("Считаем все дни четырёх сезонов. Это может занять несколько секунд.");
   try {
     const response = await fetch("/api/calculate", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ region: $("region").value, horizon, removed: state.removed, additions: state.additions }) });
+      body: JSON.stringify({ region: $("region").value, horizon_hours: horizon, removed: state.removed, additions: state.additions }) });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Не удалось выполнить расчёт");
     if (revision !== state.revision) { message("Параметры изменились во время расчёта. Нажмите «Пересчитать индекс» ещё раз."); return; }
-    state.rows = result.rows; state.displayedHorizon = horizon; state.dirty = false; renderTable();
+    state.rows = result.rows; state.baselineRows = result.baseline; state.displayedHorizon = horizon; state.dirty = false; renderTable();
     message(`Готово. В графе ${result.counts.scenario_events.toLocaleString("ru-RU")} дуг: добавлено ${result.counts.added_events}, исключено ${result.counts.removed_events}.`);
   } catch (error) { message(error.message, true); }
   finally { state.busy = false; renderStatus(); }
@@ -133,8 +138,9 @@ async function start() {
     for (const node of state.bootstrap.nodes) { $("origin").append(option(node)); $("destination").append(option(node)); }
     $("origin").value = "Анадырь"; $("destination").value = "Билибино";
     state.removed = state.removed.filter((id) => state.bootstrap.catalog.some((item) => item.id === id));
-    state.displayedHorizon = $("horizon").value;
-    state.rows = state.bootstrap.baseline[state.displayedHorizon];
+    state.displayedHorizon = 48;
+    state.rows = state.bootstrap.baseline["48ч"];
+    state.baselineRows = state.rows;
     state.dirty = Boolean(state.removed.length || state.additions.length);
     renderScenario(); renderCatalog(); renderTable(); renderStatus();
     if (state.dirty) message("Сценарий восстановлен из этой вкладки. Пересчитайте индекс.");
@@ -150,8 +156,8 @@ async function start() {
     });
     $("route-search").addEventListener("input", renderCatalog);
     $("calculate").addEventListener("click", calculate);
-    $("reset").addEventListener("click", () => { state.revision += 1; state.additions = []; state.removed = []; state.rows = state.bootstrap.baseline[state.displayedHorizon]; state.dirty = false; persist(); renderScenario(); renderCatalog(); renderTable(); renderStatus(); message("Исходная сеть восстановлена. Для выбранного H нажмите «Пересчитать индекс»."); });
-    $("horizon").addEventListener("change", () => { state.revision += 1; renderStatus(); message($("horizon").value === state.displayedHorizon && !state.dirty ? "" : "Порог H выбран. Нажмите «Пересчитать индекс», чтобы обновить таблицу."); });
+    $("reset").addEventListener("click", () => { state.revision += 1; state.additions = []; state.removed = []; state.rows = state.baselineRows; state.dirty = false; persist(); renderScenario(); renderCatalog(); renderTable(); renderStatus(); message("Исходная сеть восстановлена. Для выбранного H нажмите «Пересчитать индекс»."); });
+    $("horizon").addEventListener("input", () => { state.revision += 1; renderStatus(); message(selectedHorizon() === state.displayedHorizon && !state.dirty ? "" : "Порог H задан. Нажмите «Пересчитать индекс», чтобы обновить таблицу."); });
     document.querySelectorAll("[data-metric]").forEach((button) => button.addEventListener("click", () => {
       state.metric = button.dataset.metric;
       document.querySelectorAll("[data-metric]").forEach((item) => item.classList.toggle("active", item === button));
